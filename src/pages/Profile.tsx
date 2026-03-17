@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { User, Mail, Calendar, ShieldCheck, ArrowLeft, LogOut } from "lucide-react";
+import { User, Calendar, ShieldCheck, ArrowLeft, LogOut } from "lucide-react";
 import GlassCard from "../components/GlassCard";
 import { getMe } from "../api";
 import { clearToken, isLoggedIn } from "../authStore";
