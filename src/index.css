@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+/* Theme Variables */
+:root {
+  --bg-color: #050505;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --accent-color: #8b5cf6;
+  --accent-secondary: #22d3ee;
+}
+
+:root.light {
+  --bg-color: #ffffff;
+  --text-primary: #000000;
+  --text-secondary: #333333;
+  --text-muted: #666666;
+  --glass-bg: rgba(255, 255, 255, 0.9);
+  --glass-border: rgba(0, 0, 0, 0.15);
+  --input-bg: #f3f4f6;
+  --accent-color: #4f46e5;
+  --accent-secondary: #0ea5e9;
+}
+
+/* Enable dark mode rendering */
+:root {
+  color-scheme: dark;
+}
+
+:root.light {
+  color-scheme: light;
+}
+
+/* Base Body Styles */
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text-primary);
+  overflow-x: hidden;
+  background-color: var(--bg-color);
+  transition: background-color 0.5s ease, color 0.5s ease;
+}
+
+/* Theme-aware text helpers */
+.text-theme-primary { color: var(--text-primary); }
+.text-theme-secondary { color: var(--text-secondary); }
+.text-theme-muted { color: var(--text-muted); }
+
+.light .text-white { color: #000000; }
+.light .text-white\/40 { color: #666666; }
+.light .text-white\/60 { color: #333333; }
+.light .text-white\/70 { color: #333333; }
+.light .text-white\/50 { color: #444444; }
+.light .text-white\/30 { color: #999999; }
+.light .text-white\/20 { color: #cccccc; }
+
+.dark .glass {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.light .glass {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+}
+
+.animated-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+/* Dark/Cyberpunk Background */
+.dark .animated-bg {
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(34, 211, 238, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(236, 72, 153, 0.1) 0%, transparent 50%);
+  filter: blur(80px);
+  animation: bg-move 20s infinite alternate ease-in-out;
+}
+
+/* Light/Minimal Background - Removed atmosphere, focused on moving shapes */
+.light .animated-bg {
+  background: #ffffff;
+  overflow: hidden;
+}
+
+@keyframes bg-move {
+  0% { transform: scale(1) translate(0, 0); }
+  50% { transform: scale(1.1) translate(2%, 2%); }
+  100% { transform: scale(1) translate(0, 0); }
+}
+
+/* Floating Shapes Animation (3D-like) - Continuous and clearly visible in Light theme */
+.floating-shape {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.5;
+  filter: blur(60px);
+  animation: float-continuous 20s infinite linear;
+}
+
+.light .floating-shape {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  opacity: 0.25;
+  filter: blur(80px);
+}
+
+.dark .floating-shape {
+  background: linear-gradient(45deg, var(--accent-color), var(--accent-secondary));
+  opacity: 0.4;
+}
+
+@keyframes float-continuous {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  33% { transform: translate(15vw, 25vh) scale(1.3) rotate(120deg); }
+  66% { transform: translate(-10vw, 20vh) scale(0.7) rotate(240deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(360deg); }
+}
+
+.glass-input {
+  background: var(--input-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(4px);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+}
+
+.light .glass-input {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.glass-input:focus {
+  background: var(--input-bg);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 20px rgba(79, 70, 229, 0.1);
+}
+
+.text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(to bottom, var(--text-color), rgba(var(--text-color), 0.6));
+}
+
+.light .text-gradient {
+  background-image: linear-gradient(to bottom, #1e293b, #64748b);
+}
+
+/* Smooth fonts */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
