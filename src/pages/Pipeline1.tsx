@@ -1,3 +1,317 @@
+// import { useEffect, useRef, useState } from "react";
+// import { useNavigate } from "react-router-dom";
+// import { motion, AnimatePresence } from "framer-motion";
+// import { Upload, Sparkles, ArrowLeft, Loader2, Plus, Trash2 } from "lucide-react";
+// import GlassCard from "../components/GlassCard";
+// import { getJobStatus, postForm } from "../api";
+
+// export default function Pipeline1() {
+//   const nav = useNavigate();
+//   const pollRef = useRef<number | null>(null);
+
+//   const [mode, setMode] = useState<"auto" | "custom">("auto");
+//   const [room, setRoom] = useState<File | null>(null);
+//   const [roomPreview, setRoomPreview] = useState<string | null>(null);
+//   const [roomType, setRoomType] = useState("bedroom");
+//   const [dimensions, setDimensions] = useState("12x10");
+//   const [style, setStyle] = useState("minimal");
+//   const [budget, setBudget] = useState("medium");
+//   const [furnitures, setFurnitures] = useState<string[]>([""]);
+//   const [busy, setBusy] = useState(false);
+//   const [err, setErr] = useState<string | null>(null);
+//   const [statusText, setStatusText] = useState<string | null>(null);
+//   const [jobId, setJobId] = useState<string | null>(null);
+
+//   useEffect(() => {
+//     return () => {
+//       if (pollRef.current) window.clearInterval(pollRef.current);
+//     };
+//   }, []);
+
+//   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+//     const file = e.target.files?.[0];
+//     if (file) {
+//       setRoom(file);
+//       const reader = new FileReader();
+//       reader.onloadend = () => setRoomPreview(reader.result as string);
+//       reader.readAsDataURL(file);
+//     }
+//   };
+
+//   const addFurniture = () => {
+//     if (furnitures.length < 7) {
+//       setFurnitures([...furnitures, ""]);
+//     }
+//   };
+
+//   const removeFurniture = (index: number) => {
+//     if (furnitures.length > 1) {
+//       setFurnitures(furnitures.filter((_, i) => i !== index));
+//     }
+//   };
+
+//   const updateFurniture = (index: number, val: string) => {
+//     const newF = [...furnitures];
+//     newF[index] = val;
+//     setFurnitures(newF);
+//   };
+
+//   function startPolling(currentJobId: string) {
+//     if (pollRef.current) window.clearInterval(pollRef.current);
+
+//     pollRef.current = window.setInterval(async () => {
+//       try {
+//         const status = await getJobStatus(currentJobId);
+//         setStatusText(status.message ?? `Job status: ${status.status}`);
+
+//         if (status.status === "completed") {
+//           if (pollRef.current) window.clearInterval(pollRef.current);
+//           setBusy(false);
+//           if (status.result_url) {
+//             nav(`/result?url=${encodeURIComponent(status.result_url)}`);
+//           } else {
+//             setErr("Job completed but result URL was missing.");
+//           }
+//           return;
+//         }
+
+//         if (status.status === "failed") {
+//           if (pollRef.current) window.clearInterval(pollRef.current);
+//           setBusy(false);
+//           setErr(status.error ?? "Pipeline execution failed");
+//         }
+//       } catch (error: any) {
+//         if (pollRef.current) window.clearInterval(pollRef.current);
+//         setBusy(false);
+//         setErr(error.message ?? "Failed to fetch job status");
+//       }
+//     }, 3000);
+//   }
+
+//   async function run() {
+//     if (!room) return;
+
+//     if (mode === "custom") {
+//       const valid = furnitures.filter((f) => f.trim());
+//       if (valid.length === 0) {
+//         setErr("Please add at least one furniture name.");
+//         return;
+//       }
+//     }
+
+//     setErr(null);
+//     setBusy(true);
+//     setStatusText("Submitting job...");
+//     setJobId(null);
+
+//     try {
+//       const fd = new FormData();
+//       fd.append("room_image", room);
+//       fd.append("room_type", roomType);
+//       fd.append("dimensions", dimensions);
+//       fd.append("style", style);
+//       fd.append("budget", budget);
+
+//       let endpoint = "/run/pipeline1";
+//       if (mode === "custom") {
+//         endpoint = "/run/pipeline1-custom";
+//         fd.append("furniture_names", furnitures.filter((f) => f.trim()).join(","));
+//       }
+
+//       const data = await postForm(endpoint, fd);
+//       setJobId(data.job_id);
+//       setStatusText(data.message ?? "Job queued. Waiting for pipeline to start...");
+//       startPolling(data.job_id);
+//     } catch (e: any) {
+//       setErr(e.message ?? "Pipeline execution failed");
+//       setBusy(false);
+//       setStatusText(null);
+//     }
+//   }
+
+//   return (
+//     <div className="min-h-screen p-6 pt-24 md:p-12 md:pt-32 flex flex-col items-center relative overflow-hidden">
+//       <div className="max-w-4xl w-full relative z-10 space-y-8">
+//         <div className="flex items-center justify-between">
+//           <motion.button
+//             whileHover={{ x: -5 }}
+//             onClick={() => nav("/dashboard")}
+//             className="flex items-center gap-2 text-white/40 dark:text-white/40 light:text-slate-500 hover:text-white dark:hover:text-white light:hover:text-indigo-600 transition-colors font-bold"
+//           >
+//             <ArrowLeft className="w-5 h-5" />
+//             Back to Dashboard
+//           </motion.button>
+//         </div>
+
+//         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+//           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+//             <div className="space-y-2">
+//               <h2 className="text-4xl font-bold text-white dark:text-white light:text-slate-900 transition-colors">
+//                 {mode === "auto" ? "Auto-Furnish Pipeline" : "Custom Furniture Pipeline"}
+//               </h2>
+//               <p className="text-white/40 dark:text-white/40 light:text-slate-500 transition-colors">
+//                 {mode === "auto"
+//                   ? "Upload your room image and let AI suggest furniture"
+//                   : "Specify exactly which furniture pieces you want to see"}
+//               </p>
+//             </div>
+
+//             <div className="flex p-1 bg-white/5 rounded-xl border border-white/10 w-fit">
+//               <button
+//                 onClick={() => setMode("auto")}
+//                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+//                   mode === "auto" ? "bg-purple-600 text-white shadow-lg" : "text-white/40 hover:text-white"
+//                 }`}
+//               >
+//                 Auto-Furnish
+//               </button>
+//               <button
+//                 onClick={() => setMode("custom")}
+//                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+//                   mode === "custom" ? "bg-cyan-600 text-white shadow-lg" : "text-white/40 hover:text-white"
+//                 }`}
+//               >
+//                 Custom Furniture
+//               </button>
+//             </div>
+//           </div>
+//         </motion.div>
+
+//         <div className="grid lg:grid-cols-2 gap-8">
+//           <div className="space-y-6">
+//             <GlassCard className="border-white/5">
+//               <div className="space-y-6">
+//                 <h3 className="text-xl font-bold text-white dark:text-white light:text-slate-900 transition-colors flex items-center gap-2">
+//                   <Upload className="w-5 h-5 text-purple-400 dark:text-purple-400 light:text-indigo-600" />
+//                   Room Image
+//                 </h3>
+
+//                 <div
+//                   className={`relative aspect-video rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden ${
+//                     roomPreview
+//                       ? "border-purple-500/50"
+//                       : "border-white/10 dark:border-white/10 light:border-slate-300 hover:border-white/20 dark:hover:border-white/20 light:hover:border-indigo-400"
+//                   }`}
+//                   onClick={() => document.getElementById("room-upload")?.click()}
+//                 >
+//                   {roomPreview ? (
+//                     <img src={roomPreview} className="w-full h-full object-cover" alt="Preview" />
+//                   ) : (
+//                     <div className="absolute inset-0 flex flex-col items-center justify-center space-y-2 text-white/30 dark:text-white/30 light:text-slate-600 transition-colors">
+//                       <Upload className="w-8 h-8" />
+//                       <span className="text-sm font-medium">Click to upload room image</span>
+//                     </div>
+//                   )}
+//                   <input id="room-upload" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+//                 </div>
+//               </div>
+//             </GlassCard>
+
+//             <AnimatePresence mode="wait">
+//               {mode === "custom" && (
+//                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+//                   <GlassCard className="border-white/5">
+//                     <div className="space-y-4">
+//                       <div className="flex items-center justify-between">
+//                         <h3 className="text-xl font-bold text-white dark:text-white light:text-slate-900 transition-colors flex items-center gap-2">
+//                           <Plus className="w-5 h-5 text-cyan-400" />
+//                           Furniture Names
+//                         </h3>
+//                         <span className="text-xs text-white/40 font-bold">{furnitures.length}/7</span>
+//                       </div>
+
+//                       <div className="space-y-3">
+//                         {furnitures.map((f, i) => (
+//                           <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex gap-2">
+//                             <input
+//                               className="flex-1 glass-input rounded-xl px-4 py-2 text-white outline-none text-sm"
+//                               value={f}
+//                               onChange={(e) => updateFurniture(i, e.target.value)}
+//                               placeholder={`Furniture ${i + 1} (e.g. Sofa)`}
+//                             />
+//                             {furnitures.length > 1 && (
+//                               <button onClick={() => removeFurniture(i)} className="p-2 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors">
+//                                 <Trash2 className="w-4 h-4" />
+//                               </button>
+//                             )}
+//                           </motion.div>
+//                         ))}
+//                       </div>
+
+//                       {furnitures.length < 7 && (
+//                         <button
+//                           onClick={addFurniture}
+//                           className="w-full py-2 border-2 border-dashed border-white/10 hover:border-white/20 text-white/40 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+//                         >
+//                           <Plus className="w-4 h-4" /> Add Another
+//                         </button>
+//                       )}
+//                     </div>
+//                   </GlassCard>
+//                 </motion.div>
+//               )}
+//             </AnimatePresence>
+//           </div>
+
+//           <div className="space-y-6">
+//             <GlassCard className="border-white/5">
+//               <div className="space-y-6">
+//                 <h3 className="text-xl font-bold text-white dark:text-white light:text-slate-900 transition-colors flex items-center gap-2">
+//                   <Sparkles className="w-5 h-5 text-cyan-400 dark:text-cyan-400 light:text-indigo-600" />
+//                   Design Parameters
+//                 </h3>
+
+//                 <div className="grid grid-cols-2 gap-4">
+//                   <select value={roomType} onChange={(e) => setRoomType(e.target.value)} className="glass-input rounded-xl px-4 py-3 text-white light:text-slate-900 outline-none text-sm">
+//                     <option value="bedroom">Bedroom</option>
+//                     <option value="living room">Living Room</option>
+//                     <option value="dining room">Dining Room</option>
+//                     <option value="office">Office</option>
+//                   </select>
+//                   <input value={dimensions} onChange={(e) => setDimensions(e.target.value)} className="glass-input rounded-xl px-4 py-3 text-white light:text-slate-900 outline-none text-sm" placeholder="Room size (e.g. 12x10)" />
+//                   <select value={style} onChange={(e) => setStyle(e.target.value)} className="glass-input rounded-xl px-4 py-3 text-white light:text-slate-900 outline-none text-sm">
+//                     <option value="minimal">Minimal</option>
+//                     <option value="modern">Modern</option>
+//                     <option value="luxury">Luxury</option>
+//                     <option value="bohemian">Bohemian</option>
+//                   </select>
+//                   <select value={budget} onChange={(e) => setBudget(e.target.value)} className="glass-input rounded-xl px-4 py-3 text-white light:text-slate-900 outline-none text-sm">
+//                     <option value="low">Low</option>
+//                     <option value="medium">Medium</option>
+//                     <option value="high">High</option>
+//                   </select>
+//                 </div>
+
+//                 {jobId && <div className="text-xs text-white/40 break-all">Job ID: {jobId}</div>}
+
+//                 {statusText && (
+//                   <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-sm">
+//                     {statusText}
+//                   </div>
+//                 )}
+
+//                 {err && <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{err}</div>}
+
+//                 <motion.button
+//                   whileHover={{ scale: 1.02 }}
+//                   whileTap={{ scale: 0.98 }}
+//                   onClick={run}
+//                   disabled={!room || busy}
+//                   className="w-full py-4 bg-gradient-to-r from-purple-600 to-cyan-500 text-white !text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+//                 >
+//                   {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+//                   {busy ? "Processing..." : "Generate Result"}
+//                 </motion.button>
+//               </div>
+//             </GlassCard>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
+
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -8,6 +322,7 @@ import { getJobStatus, postForm } from "../api";
 export default function Pipeline1() {
   const nav = useNavigate();
   const pollRef = useRef<number | null>(null);
+  const activeJobIdRef = useRef<string | null>(null);
 
   const [mode, setMode] = useState<"auto" | "custom">("auto");
   const [room, setRoom] = useState<File | null>(null);
@@ -56,32 +371,65 @@ export default function Pipeline1() {
     setFurnitures(newF);
   };
 
+  function stopPolling() {
+    if (pollRef.current) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
+  async function pollOnce(currentJobId: string) {
+    if (!currentJobId) {
+      throw new Error("Missing job_id for status polling");
+    }
+
+    const status = await getJobStatus(currentJobId);
+
+    if (activeJobIdRef.current !== currentJobId) {
+      return;
+    }
+
+    setStatusText(status.message ?? `Job status: ${status.status}`);
+
+    if (status.status === "completed") {
+      stopPolling();
+      setBusy(false);
+      if (status.result_url) {
+        nav(`/result?url=${encodeURIComponent(status.result_url)}`);
+      } else {
+        setErr("Job completed but result URL was missing.");
+      }
+      return;
+    }
+
+    if (status.status === "failed") {
+      stopPolling();
+      setBusy(false);
+      setErr(status.error ?? "Pipeline execution failed");
+    }
+  }
+
   function startPolling(currentJobId: string) {
-    if (pollRef.current) window.clearInterval(pollRef.current);
+    if (!currentJobId || String(currentJobId).trim() === "") {
+      setBusy(false);
+      setErr("Missing job_id from backend response");
+      return;
+    }
+
+    activeJobIdRef.current = currentJobId;
+    stopPolling();
+
+    pollOnce(currentJobId).catch((error: any) => {
+      stopPolling();
+      setBusy(false);
+      setErr(error.message ?? "Failed to fetch job status");
+    });
 
     pollRef.current = window.setInterval(async () => {
       try {
-        const status = await getJobStatus(currentJobId);
-        setStatusText(status.message ?? `Job status: ${status.status}`);
-
-        if (status.status === "completed") {
-          if (pollRef.current) window.clearInterval(pollRef.current);
-          setBusy(false);
-          if (status.result_url) {
-            nav(`/result?url=${encodeURIComponent(status.result_url)}`);
-          } else {
-            setErr("Job completed but result URL was missing.");
-          }
-          return;
-        }
-
-        if (status.status === "failed") {
-          if (pollRef.current) window.clearInterval(pollRef.current);
-          setBusy(false);
-          setErr(status.error ?? "Pipeline execution failed");
-        }
+        await pollOnce(currentJobId);
       } catch (error: any) {
-        if (pollRef.current) window.clearInterval(pollRef.current);
+        stopPolling();
         setBusy(false);
         setErr(error.message ?? "Failed to fetch job status");
       }
@@ -99,6 +447,8 @@ export default function Pipeline1() {
       }
     }
 
+    stopPolling();
+    activeJobIdRef.current = null;
     setErr(null);
     setBusy(true);
     setStatusText("Submitting job...");
@@ -119,10 +469,17 @@ export default function Pipeline1() {
       }
 
       const data = await postForm(endpoint, fd);
-      setJobId(data.job_id);
-      setStatusText(data.message ?? "Job queued. Waiting for pipeline to start...");
-      startPolling(data.job_id);
+      const nextJobId = data?.job_id ? String(data.job_id) : "";
+
+      if (!nextJobId) {
+        throw new Error("Backend did not return job_id");
+      }
+
+      setJobId(nextJobId);
+      setStatusText(data?.message ?? "Job queued. Waiting for pipeline to start...");
+      startPolling(nextJobId);
     } catch (e: any) {
+      stopPolling();
       setErr(e.message ?? "Pipeline execution failed");
       setBusy(false);
       setStatusText(null);
@@ -262,20 +619,19 @@ export default function Pipeline1() {
                 </h3>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <select value={roomType} onChange={(e) => setRoomType(e.target.value)} className="glass-input rounded-xl px-4 py-3 text-white light:text-slate-900 outline-none text-sm">
+                  <select className="glass-input rounded-xl px-4 py-3 text-white outline-none" value={roomType} onChange={(e) => setRoomType(e.target.value)}>
                     <option value="bedroom">Bedroom</option>
                     <option value="living room">Living Room</option>
                     <option value="dining room">Dining Room</option>
-                    <option value="office">Office</option>
                   </select>
-                  <input value={dimensions} onChange={(e) => setDimensions(e.target.value)} className="glass-input rounded-xl px-4 py-3 text-white light:text-slate-900 outline-none text-sm" placeholder="Room size (e.g. 12x10)" />
-                  <select value={style} onChange={(e) => setStyle(e.target.value)} className="glass-input rounded-xl px-4 py-3 text-white light:text-slate-900 outline-none text-sm">
+                  <input className="glass-input rounded-xl px-4 py-3 text-white outline-none" value={dimensions} onChange={(e) => setDimensions(e.target.value)} placeholder="12x10" />
+                  <select className="glass-input rounded-xl px-4 py-3 text-white outline-none" value={style} onChange={(e) => setStyle(e.target.value)}>
                     <option value="minimal">Minimal</option>
                     <option value="modern">Modern</option>
-                    <option value="luxury">Luxury</option>
                     <option value="bohemian">Bohemian</option>
+                    <option value="luxury">Luxury</option>
                   </select>
-                  <select value={budget} onChange={(e) => setBudget(e.target.value)} className="glass-input rounded-xl px-4 py-3 text-white light:text-slate-900 outline-none text-sm">
+                  <select className="glass-input rounded-xl px-4 py-3 text-white outline-none" value={budget} onChange={(e) => setBudget(e.target.value)}>
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
