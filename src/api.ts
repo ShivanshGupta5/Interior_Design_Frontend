@@ -7,6 +7,18 @@ export const API_BASE =
     ? envBase
     : `${window.location.protocol}//${window.location.hostname}:8001`;
 
+export type JobStatusResponse = {
+  job_id: string;
+  type: string;
+  status: "queued" | "running" | "completed" | "failed";
+  message?: string | null;
+  result_url?: string | null;
+  run_id?: string | null;
+  error?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export async function postForm(path: string, form: FormData) {
   const email = getEmailFromToken();
   if (email) form.append("email", email);
@@ -18,6 +30,13 @@ export async function postForm(path: string, form: FormData) {
 
   const data = await res.json();
   if (!res.ok) throw new Error(data?.detail ?? "Request failed");
+  return data;
+}
+
+export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
+  const res = await fetch(`${API_BASE}/jobs/${jobId}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.detail ?? "Failed to fetch job status");
   return data;
 }
 

@@ -1,19 +1,33 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Sparkles, ArrowLeft, Loader2, Plus, Trash2, Image as ImageIcon } from "lucide-react";
+import { Upload, Sparkles, ArrowLeft, Loader2, Plus, Trash2, ImageIcon } from "lucide-react";
 import GlassCard from "../components/GlassCard";
-import { postForm } from "../api";
+import { getJobStatus, postForm } from "../api";
 
-type Item = { name: string; file: File | null; preview?: string };
+type Item = {
+  name: string;
+  file: File | null;
+  preview?: string;
+};
 
 export default function Pipeline2() {
   const nav = useNavigate();
+  const pollRef = useRef<number | null>(null);
+
   const [room, setRoom] = useState<File | null>(null);
   const [roomPreview, setRoomPreview] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([{ name: "", file: null }]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [statusText, setStatusText] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current);
+    };
+  }, []);
 
   const handleRoomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,7 +52,7 @@ export default function Pipeline2() {
   function updateItem(idx: number, patch: Partial<Item>) {
     const newItems = [...items];
     newItems[idx] = { ...newItems[idx], ...patch };
-    
+
     if (patch.file) {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -51,6 +65,38 @@ export default function Pipeline2() {
     }
   }
 
+  function startPolling(currentJobId: string) {
+    if (pollRef.current) window.clearInterval(pollRef.current);
+
+    pollRef.current = window.setInterval(async () => {
+      try {
+        const status = await getJobStatus(currentJobId);
+        setStatusText(status.message ?? `Job status: ${status.status}`);
+
+        if (status.status === "completed") {
+          if (pollRef.current) window.clearInterval(pollRef.current);
+          setBusy(false);
+          if (status.result_url) {
+            nav(`/result?url=${encodeURIComponent(status.result_url)}`);
+          } else {
+            setErr("Job completed but result URL was missing.");
+          }
+          return;
+        }
+
+        if (status.status === "failed") {
+          if (pollRef.current) window.clearInterval(pollRef.current);
+          setBusy(false);
+          setErr(status.error ?? "Pipeline execution failed");
+        }
+      } catch (error: any) {
+        if (pollRef.current) window.clearInterval(pollRef.current);
+        setBusy(false);
+        setErr(error.message ?? "Failed to fetch job status");
+      }
+    }, 3000);
+  }
+
   async function run() {
     if (!room) return;
     const valid = items.filter((x) => x.name.trim() && x.file);
@@ -58,8 +104,12 @@ export default function Pipeline2() {
       setErr("Please add at least 1 furniture image and its name.");
       return;
     }
+
     setErr(null);
     setBusy(true);
+    setStatusText("Submitting job...");
+    setJobId(null);
+
     try {
       const fd = new FormData();
       fd.append("room_image", room);
@@ -67,11 +117,13 @@ export default function Pipeline2() {
       valid.forEach((v) => fd.append("furniture_images", v.file as File));
 
       const data = await postForm("/run/pipeline2", fd);
-      nav(`/result?url=${encodeURIComponent(data.result_url)}`);
+      setJobId(data.job_id);
+      setStatusText(data.message ?? "Job queued. Waiting for pipeline to start...");
+      startPolling(data.job_id);
     } catch (e: any) {
       setErr(e.message ?? "Pipeline execution failed");
-    } finally {
       setBusy(false);
+      setStatusText(null);
     }
   }
 
@@ -89,15 +141,13 @@ export default function Pipeline2() {
           </motion.button>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-2"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
           <h2 className="text-4xl font-bold text-white dark:text-white light:text-slate-900 transition-colors">
             Custom Assets Pipeline
           </h2>
-          <p className="text-white/40 dark:text-white/40 light:text-slate-500 transition-colors">Upload your room and the specific furniture you want to place</p>
+          <p className="text-white/40 dark:text-white/40 light:text-slate-500 transition-colors">
+            Upload your room and the specific furniture you want to place
+          </p>
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -108,11 +158,14 @@ export default function Pipeline2() {
                   <Upload className="w-5 h-5 text-purple-400 dark:text-purple-400 light:text-indigo-600" />
                   Base Room
                 </h3>
-                
-                <div 
-                  className={`relative aspect-square rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden
-                    ${roomPreview ? 'border-purple-500/50' : 'border-white/10 dark:border-white/10 light:border-slate-300 hover:border-white/20 dark:hover:border-white/20 light:hover:border-indigo-400'}`}
-                  onClick={() => document.getElementById('room-upload')?.click()}
+
+                <div
+                  className={`relative aspect-square rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden ${
+                    roomPreview
+                      ? "border-purple-500/50"
+                      : "border-white/10 dark:border-white/10 light:border-slate-300 hover:border-white/20 dark:hover:border-white/20 light:hover:border-indigo-400"
+                  }`}
+                  onClick={() => document.getElementById("room-upload")?.click()}
                 >
                   {roomPreview ? (
                     <img src={roomPreview} className="w-full h-full object-cover" alt="Preview" />
@@ -122,20 +175,18 @@ export default function Pipeline2() {
                       <span className="text-sm font-medium">Click to upload base room image</span>
                     </div>
                   )}
-                  <input 
-                    id="room-upload"
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleRoomChange} 
-                  />
+                  <input id="room-upload" type="file" accept="image/*" className="hidden" onChange={handleRoomChange} />
                 </div>
 
-                {err && (
-                  <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-                    {err}
+                {jobId && <div className="text-xs text-white/40 break-all">Job ID: {jobId}</div>}
+
+                {statusText && (
+                  <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-sm">
+                    {statusText}
                   </div>
                 )}
+
+                {err && <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{err}</div>}
 
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -180,9 +231,12 @@ export default function Pipeline2() {
                   >
                     <GlassCard className="p-4 border-white/5 hover:border-white/10 transition-colors">
                       <div className="flex flex-col sm:flex-row gap-4">
-                        <div 
-                          className={`w-24 h-24 rounded-xl border-2 border-dashed flex-shrink-0 cursor-pointer overflow-hidden flex items-center justify-center
-                            ${it.preview ? 'border-cyan-500/50' : 'border-white/10 dark:border-white/10 light:border-slate-300 hover:border-white/20 dark:hover:border-white/20 light:hover:border-indigo-400'}`}
+                        <div
+                          className={`w-24 h-24 rounded-xl border-2 border-dashed flex-shrink-0 cursor-pointer overflow-hidden flex items-center justify-center ${
+                            it.preview
+                              ? "border-cyan-500/50"
+                              : "border-white/10 dark:border-white/10 light:border-slate-300 hover:border-white/20 dark:hover:border-white/20 light:hover:border-indigo-400"
+                          }`}
                           onClick={() => document.getElementById(`file-${idx}`)?.click()}
                         >
                           {it.preview ? (
@@ -190,15 +244,15 @@ export default function Pipeline2() {
                           ) : (
                             <ImageIcon className="w-6 h-6 text-white/20 dark:text-white/20 light:text-slate-600 transition-colors" />
                           )}
-                          <input 
+                          <input
                             id={`file-${idx}`}
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={(e) => updateItem(idx, { file: e.target.files?.[0] ?? null })} 
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => updateItem(idx, { file: e.target.files?.[0] ?? null })}
                           />
                         </div>
-                        
+
                         <div className="flex-1 space-y-4">
                           <div className="flex items-center gap-3">
                             <input
