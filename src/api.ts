@@ -4,12 +4,12 @@
 
 // export const API_BASE =
 //   envBase && envBase.length > 0
-//     ? envBase
+//     ? envBase.replace(/\/$/, "")
 //     : `${window.location.protocol}//${window.location.hostname}:8001`;
 
 // export type JobStatusResponse = {
 //   job_id: string;
-//   type: string;
+//   job_type?: string;
 //   status: "queued" | "running" | "completed" | "failed";
 //   message?: string | null;
 //   result_url?: string | null;
@@ -19,25 +19,52 @@
 //   updated_at?: string;
 // };
 
+// async function parseJsonSafely(res: Response) {
+//   const text = await res.text();
+//   if (!text) return null;
+
+//   try {
+//     return JSON.parse(text);
+//   } catch {
+//     throw new Error(`Invalid JSON response from ${res.url}`);
+//   }
+// }
+
 // export async function postForm(path: string, form: FormData) {
 //   const email = getEmailFromToken();
-//   if (email) form.append("email", email);
+//   if (email && !form.has("email")) form.append("email", email);
 
 //   const res = await fetch(`${API_BASE}${path}`, {
 //     method: "POST",
 //     body: form,
+//     cache: "no-store",
 //   });
 
-//   const data = await res.json();
-//   if (!res.ok) throw new Error(data?.detail ?? "Request failed");
+//   const data = await parseJsonSafely(res);
+//   if (!res.ok) throw new Error(data?.detail ?? data?.error ?? "Request failed");
 //   return data;
 // }
 
 // export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
-//   const res = await fetch(`${API_BASE}/jobs/${jobId}`);
-//   const data = await res.json();
-//   if (!res.ok) throw new Error(data?.detail ?? "Failed to fetch job status");
-//   return data;
+//   if (!jobId || String(jobId).trim() === "") {
+//     throw new Error("Missing job_id for status polling");
+//   }
+
+//   const url = new URL(`${API_BASE}/jobs/${encodeURIComponent(jobId)}`);
+//   url.searchParams.set("_ts", Date.now().toString());
+
+//   const res = await fetch(url.toString(), {
+//     method: "GET",
+//     cache: "no-store",
+//     headers: {
+//       "Cache-Control": "no-cache, no-store, must-revalidate",
+//       Pragma: "no-cache",
+//     },
+//   });
+
+//   const data = await parseJsonSafely(res);
+//   if (!res.ok) throw new Error(data?.detail ?? data?.error ?? "Failed to fetch job status");
+//   return data as JobStatusResponse;
 // }
 
 // export async function requestSignup(email: string, password: string) {
@@ -45,9 +72,10 @@
 //     method: "POST",
 //     headers: { "Content-Type": "application/json" },
 //     body: JSON.stringify({ email, password }),
+//     cache: "no-store",
 //   });
 
-//   const data = await res.json();
+//   const data = await parseJsonSafely(res);
 //   if (!res.ok) throw new Error(data?.detail ?? "Verification failed");
 //   return data;
 // }
@@ -57,9 +85,10 @@
 //     method: "POST",
 //     headers: { "Content-Type": "application/json" },
 //     body: JSON.stringify({ email, password, otp }),
+//     cache: "no-store",
 //   });
 
-//   const data = await res.json();
+//   const data = await parseJsonSafely(res);
 //   if (!res.ok) throw new Error(data?.detail ?? "Signup failed");
 //   return data;
 // }
@@ -68,8 +97,10 @@
 //   const email = getEmailFromToken();
 //   if (!email) return null;
 
-//   const res = await fetch(`${API_BASE}/auth/me?email=${encodeURIComponent(email)}`);
-//   const data = await res.json();
+//   const res = await fetch(`${API_BASE}/auth/me?email=${encodeURIComponent(email)}`, {
+//     cache: "no-store",
+//   });
+//   const data = await parseJsonSafely(res);
 //   if (!res.ok) throw new Error(data?.detail ?? "Failed to fetch profile");
 //   return data;
 // }
@@ -79,13 +110,13 @@
 //     method: "POST",
 //     headers: { "Content-Type": "application/json" },
 //     body: JSON.stringify({ email, password }),
+//     cache: "no-store",
 //   });
 
-//   const data = await res.json();
+//   const data = await parseJsonSafely(res);
 //   if (!res.ok) throw new Error(data?.detail ?? "Signin failed");
 //   return data as { access_token: string };
 // }
-
 
 import { getEmailFromToken } from "./authStore";
 
@@ -108,6 +139,10 @@ export type JobStatusResponse = {
   updated_at?: string;
 };
 
+const NGROK_HEADERS: Record<string, string> = {
+  "ngrok-skip-browser-warning": "true",
+};
+
 async function parseJsonSafely(res: Response) {
   const text = await res.text();
   if (!text) return null;
@@ -127,6 +162,9 @@ export async function postForm(path: string, form: FormData) {
     method: "POST",
     body: form,
     cache: "no-store",
+    headers: {
+      ...NGROK_HEADERS,
+    },
   });
 
   const data = await parseJsonSafely(res);
@@ -146,20 +184,26 @@ export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
     method: "GET",
     cache: "no-store",
     headers: {
+      ...NGROK_HEADERS,
       "Cache-Control": "no-cache, no-store, must-revalidate",
       Pragma: "no-cache",
     },
   });
 
   const data = await parseJsonSafely(res);
-  if (!res.ok) throw new Error(data?.detail ?? data?.error ?? "Failed to fetch job status");
+  if (!res.ok) {
+    throw new Error(data?.detail ?? data?.error ?? "Failed to fetch job status");
+  }
   return data as JobStatusResponse;
 }
 
 export async function requestSignup(email: string, password: string) {
   const res = await fetch(`${API_BASE}/auth/request-signup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...NGROK_HEADERS,
+    },
     body: JSON.stringify({ email, password }),
     cache: "no-store",
   });
@@ -172,7 +216,10 @@ export async function requestSignup(email: string, password: string) {
 export async function signup(email: string, password: string, otp: string) {
   const res = await fetch(`${API_BASE}/auth/signup`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...NGROK_HEADERS,
+    },
     body: JSON.stringify({ email, password, otp }),
     cache: "no-store",
   });
@@ -188,7 +235,11 @@ export async function getMe() {
 
   const res = await fetch(`${API_BASE}/auth/me?email=${encodeURIComponent(email)}`, {
     cache: "no-store",
+    headers: {
+      ...NGROK_HEADERS,
+    },
   });
+
   const data = await parseJsonSafely(res);
   if (!res.ok) throw new Error(data?.detail ?? "Failed to fetch profile");
   return data;
@@ -197,7 +248,10 @@ export async function getMe() {
 export async function signin(email: string, password: string) {
   const res = await fetch(`${API_BASE}/auth/signin`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...NGROK_HEADERS,
+    },
     body: JSON.stringify({ email, password }),
     cache: "no-store",
   });
